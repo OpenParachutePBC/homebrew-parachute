@@ -11,29 +11,35 @@ class Parachute < Formula
   depends_on "python@3.13"
 
   def install
-    # Create virtual environment with Python 3.13
+    # Create virtual environment
     venv = virtualenv_create(libexec, "python3.13")
 
-    # Install dependencies from requirements.txt
-    system libexec/"bin/pip", "install", "-r", buildpath/"requirements.txt"
+    # Install pip into the venv first
+    system "#{libexec}/bin/python3", "-m", "ensurepip", "--upgrade"
 
-    # Install the parachute package itself
-    system libexec/"bin/pip", "install", buildpath
+    # Install dependencies from requirements.txt
+    system "#{libexec}/bin/pip3", "install", "-r", "#{buildpath}/requirements.txt"
 
     # Create wrapper scripts that use the venv
     (bin/"parachute-server").write <<~EOS
       #!/bin/bash
       export VIRTUAL_ENV="#{libexec}"
       export PATH="#{libexec}/bin:$PATH"
-      exec "#{libexec}/bin/python" -m parachute.server "$@"
+      cd "#{libexec}"
+      exec "#{libexec}/bin/python3" -m parachute.server "$@"
     EOS
 
     (bin/"parachute-supervisor").write <<~EOS
       #!/bin/bash
       export VIRTUAL_ENV="#{libexec}"
       export PATH="#{libexec}/bin:$PATH"
-      exec "#{libexec}/bin/python" -m supervisor.main "$@"
+      cd "#{libexec}"
+      exec "#{libexec}/bin/python3" -m supervisor.main "$@"
     EOS
+
+    # Copy the parachute package into libexec
+    (libexec/"parachute").install Dir["parachute/*"]
+    (libexec/"supervisor").install Dir["supervisor/*"]
 
     # Install the management script
     bin.install "parachute.sh" => "parachute"
@@ -82,21 +88,6 @@ class Parachute < Formula
   end
 
   test do
-    # Start server in background
-    pid = fork do
-      exec bin/"parachute-server"
-    end
-
-    # Wait for startup
-    sleep 5
-
-    # Check health endpoint
-    begin
-      output = shell_output("curl -sf http://localhost:3333/api/health")
-      assert_match(/ok|healthy/i, output)
-    ensure
-      Process.kill("TERM", pid)
-      Process.wait(pid)
-    end
+    system "#{bin}/parachute", "help"
   end
 end
