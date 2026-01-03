@@ -2,7 +2,7 @@ class Parachute < Formula
   desc "AI orchestration server for your knowledge vault"
   homepage "https://github.com/OpenParachutePBC/parachute"
   url "https://github.com/OpenParachutePBC/parachute-base/archive/refs/tags/v0.1.0.tar.gz"
-  sha256 "PLACEHOLDER_REPLACE_WITH_ACTUAL_SHA256"
+  sha256 "1cff8bdcd400e48c7a4b56ea038e31d7eb0e6a099e15b280380a5493b3daf86e"
   license "MIT"
   head "https://github.com/OpenParachutePBC/parachute-base.git", branch: "main"
 
