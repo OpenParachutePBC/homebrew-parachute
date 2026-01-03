@@ -1,6 +1,4 @@
 class Parachute < Formula
-  include Language::Python::Virtualenv
-
   desc "AI orchestration server for your knowledge vault"
   homepage "https://github.com/OpenParachutePBC/parachute"
   url "https://github.com/OpenParachutePBC/parachute-base/archive/refs/tags/v0.1.0.tar.gz"
@@ -10,38 +8,43 @@ class Parachute < Formula
 
   depends_on "python@3.13"
 
+  # Note: This formula installs the wrapper scripts and CLI.
+  # Users need to run `parachute setup` on first use to install Python dependencies.
+
   def install
-    # Create virtual environment
-    venv = virtualenv_create(libexec, "python3.13")
+    # Install the Python packages to libexec
+    libexec.install Dir["parachute", "supervisor", "requirements.txt"]
 
-    # Install pip into the venv first
-    system "#{libexec}/bin/python3", "-m", "ensurepip", "--upgrade"
-
-    # Install dependencies from requirements.txt
-    system "#{libexec}/bin/pip3", "install", "-r", "#{buildpath}/requirements.txt"
-
-    # Create wrapper scripts that use the venv
+    # Create wrapper scripts
     (bin/"parachute-server").write <<~EOS
       #!/bin/bash
-      export VIRTUAL_ENV="#{libexec}"
-      export PATH="#{libexec}/bin:$PATH"
-      cd "#{libexec}"
-      exec "#{libexec}/bin/python3" -m parachute.server "$@"
+      SCRIPT_DIR="#{libexec}"
+      if [ ! -d "$SCRIPT_DIR/venv" ]; then
+        echo "Setting up Python environment..."
+        python3.13 -m venv "$SCRIPT_DIR/venv"
+        "$SCRIPT_DIR/venv/bin/pip" install -q -r "$SCRIPT_DIR/requirements.txt"
+      fi
+      export VIRTUAL_ENV="$SCRIPT_DIR/venv"
+      export PATH="$SCRIPT_DIR/venv/bin:$PATH"
+      export PYTHONPATH="$SCRIPT_DIR:$PYTHONPATH"
+      exec "$SCRIPT_DIR/venv/bin/python" -m parachute.server "$@"
     EOS
 
     (bin/"parachute-supervisor").write <<~EOS
       #!/bin/bash
-      export VIRTUAL_ENV="#{libexec}"
-      export PATH="#{libexec}/bin:$PATH"
-      cd "#{libexec}"
-      exec "#{libexec}/bin/python3" -m supervisor.main "$@"
+      SCRIPT_DIR="#{libexec}"
+      if [ ! -d "$SCRIPT_DIR/venv" ]; then
+        echo "Setting up Python environment..."
+        python3.13 -m venv "$SCRIPT_DIR/venv"
+        "$SCRIPT_DIR/venv/bin/pip" install -q -r "$SCRIPT_DIR/requirements.txt"
+      fi
+      export VIRTUAL_ENV="$SCRIPT_DIR/venv"
+      export PATH="$SCRIPT_DIR/venv/bin:$PATH"
+      export PYTHONPATH="$SCRIPT_DIR:$PYTHONPATH"
+      exec "$SCRIPT_DIR/venv/bin/python" -m supervisor.main "$@"
     EOS
 
-    # Copy the parachute package into libexec
-    (libexec/"parachute").install Dir["parachute/*"]
-    (libexec/"supervisor").install Dir["supervisor/*"]
-
-    # Install the management script
+    # Install the management CLI script
     bin.install "parachute.sh" => "parachute"
   end
 
@@ -49,6 +52,10 @@ class Parachute < Formula
     # Create log and data directories
     (var/"log").mkpath
     (var/"parachute").mkpath
+
+    # Pre-install dependencies
+    ohai "Setting up Python environment..."
+    system bin/"parachute-server", "--help" rescue nil
   end
 
   service do
@@ -65,6 +72,8 @@ class Parachute < Formula
   def caveats
     <<~EOS
       Parachute Base Server has been installed!
+
+      First run will install Python dependencies (one-time setup).
 
       To start now and restart at login:
         brew services start parachute
@@ -88,6 +97,6 @@ class Parachute < Formula
   end
 
   test do
-    system "#{bin}/parachute", "help"
+    assert_match "Usage", shell_output("#{bin}/parachute help")
   end
 end
