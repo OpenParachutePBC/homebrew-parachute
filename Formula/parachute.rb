@@ -1,4 +1,6 @@
 class Parachute < Formula
+  include Language::Python::Virtualenv
+
   desc "AI orchestration server for your knowledge vault"
   homepage "https://github.com/OpenParachutePBC/parachute"
   url "https://github.com/OpenParachutePBC/parachute-base/archive/refs/tags/v0.1.0.tar.gz"
@@ -12,11 +14,11 @@ class Parachute < Formula
     # Create virtual environment with Python 3.13
     venv = virtualenv_create(libexec, "python3.13")
 
-    # Install dependencies
-    system libexec/"bin/pip", "install", "-r", "requirements.txt"
+    # Install dependencies from requirements.txt
+    system libexec/"bin/pip", "install", "-r", buildpath/"requirements.txt"
 
-    # Install the parachute package
-    venv.pip_install buildpath
+    # Install the parachute package itself
+    system libexec/"bin/pip", "install", buildpath
 
     # Create wrapper scripts that use the venv
     (bin/"parachute-server").write <<~EOS
